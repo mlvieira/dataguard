@@ -1,0 +1,21 @@
+fields:
+  user_id:
+    type: int
+    unique: true
+    nullable: false
+  username:
+    type: str
+    nullable: false
+  status:
+    type: str
+    allowed_values: ["active", "pending", "inactive"]
+  age:
+    type: int
+    min_value: 18
+    max_value: 120
+  email:
+    type: str
+    regex: '^[a-z0-9]+@[a-z0-9]+\.[a-z]{2,}$'
+  signup_date:
+    type: str
+    no_future_dates: true

@@ -1,0 +1,25 @@
+[project]
+name = "dataguard"
+version = "0.1.0"
+description = "Lightweight data validation tool"
+authors = [
+    {name = "Matheus Vieira",email = "matheus.lvieira@proton.me"}
+]
+requires-python = "^3.10"
+dependencies = [
+    "polars (>=1.41.0,<2.0.0)",
+    "pydantic (>=2.13.4,<3.0.0)",
+    "typer (>=0.25.1,<0.26.0)",
+    "pyyaml (>=6.0.3,<7.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+packages = [{include = "dataguard", from = "src"}]
+
+[tool.poetry.scripts]
+dataguard = "dataguard.cli:main"

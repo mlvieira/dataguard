@@ -1,0 +1,58 @@
+import polars as pl
+
+
+def validate_dataframe(df: pl.DataFrame, schema: dict) -> bool:
+    is_valid = True
+
+    for column, rules in schema.items():
+        if column not in df.columns:
+            print(f"FAILED: Missing column '{column}'")
+            return False
+
+        expected_type = rules.get("type")
+
+        if expected_type is None:
+            print(f"ERROR: No valid Polars type found for column '{column}'")
+            is_valid = False
+            continue
+
+        try:
+            casted_col = df[column].cast(expected_type, strict=False)
+
+            failed_rows = df.filter(df[column].is_not_null() & casted_col.is_null())
+
+            if failed_rows.height > 0:
+                print(
+                    f"FAILED: '{column}' contains {failed_rows.height} values that do not match type."
+                )
+                is_valid = False
+        except Exception as e:
+            print(f"ERROR: Could not cast column '{column}': {e}")
+            is_valid = False
+
+        # Check Nullability
+        if rules.get("nullable") is False:
+            null_count = df[column].is_null().sum()
+            if null_count > 0:
+                print(f"FAILED: '{column}' has {null_count} nulls but is non-nullable.")
+                is_valid = False
+
+        # Check Uniqueness
+        if rules.get("unique") is True:
+            if not df[column].is_unique().all():
+                print(f"FAILED: '{column}' contains duplicate values.")
+                is_valid = False
+
+        allowed_values = rules.get("allowed_values")
+        if allowed_values:
+            invalid_rows = df.filter(~pl.col(column).is_in(allowed_values))
+
+            if invalid_rows.height > 0:
+                print(
+                    f"FAILED: '{column}' contains {invalid_rows.height} invalid values."
+                )
+                offending_values = invalid_rows[column].unique().to_list()
+                print(f"  -> Found invalid values: {offending_values}")
+                is_valid = False
+
+    return is_valid
