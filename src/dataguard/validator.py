@@ -43,9 +43,49 @@ def validate_dataframe(df: pl.DataFrame, schema: dict) -> bool:
                 print(f"FAILED: '{column}' contains duplicate values.")
                 is_valid = False
 
+        # Check if column only contains allowed values
         allowed_values = rules.get("allowed_values")
         if allowed_values:
             invalid_rows = df.filter(~pl.col(column).is_in(allowed_values))
+
+            if invalid_rows.height > 0:
+                print(
+                    f"FAILED: '{column}' contains {invalid_rows.height} invalid values."
+                )
+                offending_values = invalid_rows[column].unique().to_list()
+                print(f"  -> Found invalid values: {offending_values}")
+                is_valid = False
+
+        # Check if column only has values below X value
+        min_value = rules.get("min_value")
+        if min_value:
+            invalid_rows = df.filter(pl.col(column) < min_value)
+
+            if invalid_rows.height > 0:
+                print(
+                    f"FAILED: '{column}' contains {invalid_rows.height} invalid values."
+                )
+                offending_values = invalid_rows[column].unique().to_list()
+                print(f"  -> Found invalid values: {offending_values}")
+                is_valid = False
+
+        # Check if column only has values above X value
+        max_value = rules.get("max_value")
+        if max_value:
+            invalid_rows = df.filter(pl.col(column) > max_value)
+
+            if invalid_rows.height > 0:
+                print(
+                    f"FAILED: '{column}' contains {invalid_rows.height} invalid values."
+                )
+                offending_values = invalid_rows[column].unique().to_list()
+                print(f"  -> Found invalid values: {offending_values}")
+                is_valid = False
+
+        # Check if column matches a regex pattern
+        regex_value = rules.get("regex")
+        if regex_value:
+            invalid_rows = df.filter(~pl.col(column).str.contains(regex_value))
 
             if invalid_rows.height > 0:
                 print(
