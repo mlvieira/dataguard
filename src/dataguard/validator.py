@@ -3,12 +3,24 @@ from datetime import datetime
 import polars as pl
 
 
-def _add_error(report, column, rule, message, invalid_df=None):
+def _add_error(
+    report,
+    column,
+    rule,
+    message,
+    total_failed: int | None = None,
+    sample_values: list | None = None,
+):
     error = {"column": column, "rule": rule, "message": message}
-    if invalid_df is not None:
-        error["total_failed"] = invalid_df.height
-        error["sample_offending_values"] = invalid_df[column].unique().to_list()[:5]
+    if total_failed is not None:
+        error["total_failed"] = int(total_failed)
+    if sample_values is not None:
+        error["sample_offending_values"] = sample_values
     report.append(error)
+
+
+def _sample_values(series: pl.Series, mask: pl.Series) -> list:
+    return series.filter(mask).unique().head(5).to_list()
 
 
 def validate_dataframe(df: pl.DataFrame, schema: dict) -> list:
@@ -19,77 +31,107 @@ def validate_dataframe(df: pl.DataFrame, schema: dict) -> list:
             _add_error(report, column, "schema", "Column is missing")
             continue
 
+        series = df[column]
+
         # Type Check
         expected_type = rules.get("type")
         if expected_type:
-            casted_col = df[column].cast(expected_type, strict=False)
-            failed_rows = df.filter(df[column].is_not_null() & casted_col.is_null())
-            if failed_rows.height > 0:
-                _add_error(report, column, "type", "Type mismatch", failed_rows)
+            casted_col = series.cast(expected_type, strict=False)
+            type_mask = series.is_not_null() & casted_col.is_null()
+            type_failed = int(type_mask.sum())
+            if type_failed > 0:
+                _add_error(
+                    report,
+                    column,
+                    "type",
+                    "Type mismatch",
+                    total_failed=type_failed,
+                    sample_values=_sample_values(series, type_mask),
+                )
 
         # Nullability
-        if rules.get("nullable") is False and df[column].null_count() > 0:
+        if rules.get("nullable") is False and series.null_count() > 0:
             _add_error(report, column, "nullable", "Contains null values")
 
         # Uniqueness
-        if rules.get("unique") is True and not df[column].is_unique().all():
+        if rules.get("unique") is True and not series.is_unique().all():
             _add_error(report, column, "unique", "Contains duplicates")
 
         # Allowed Values
         if "allowed_values" in rules:
-            invalid = df.filter(~pl.col(column).is_in(rules["allowed_values"]))
-            if invalid.height > 0:
+            allowed_mask = (~series.is_in(rules["allowed_values"])).fill_null(False)
+            allowed_failed = int(allowed_mask.sum())
+            if allowed_failed > 0:
                 _add_error(
                     report,
                     column,
                     "allowed_values",
                     "Invalid categorical value",
-                    invalid,
+                    total_failed=allowed_failed,
+                    sample_values=_sample_values(series, allowed_mask),
                 )
 
         # Min/Max Value
         if "min_value" in rules:
-            invalid = df.filter(pl.col(column) < rules["min_value"])
-            if invalid.height > 0:
+            min_mask = (series < rules["min_value"]).fill_null(False)
+            min_failed = int(min_mask.sum())
+            if min_failed > 0:
                 _add_error(
                     report,
                     column,
                     "min_value",
                     f"Value below {rules['min_value']}",
-                    invalid,
+                    total_failed=min_failed,
+                    sample_values=_sample_values(series, min_mask),
                 )
 
         if "max_value" in rules:
-            invalid = df.filter(pl.col(column) > rules["max_value"])
-            if invalid.height > 0:
+            max_mask = (series > rules["max_value"]).fill_null(False)
+            max_failed = int(max_mask.sum())
+            if max_failed > 0:
                 _add_error(
                     report,
                     column,
                     "max_value",
                     f"Value above {rules['max_value']}",
-                    invalid,
+                    total_failed=max_failed,
+                    sample_values=_sample_values(series, max_mask),
                 )
 
         # Regex
         if "regex" in rules:
-            invalid = df.filter(~pl.col(column).str.contains(rules["regex"]))
-            if invalid.height > 0:
-                _add_error(report, column, "regex", "Pattern mismatch", invalid)
+            regex_mask = (~series.str.contains(rules["regex"])).fill_null(False)
+            regex_failed = int(regex_mask.sum())
+            if regex_failed > 0:
+                _add_error(
+                    report,
+                    column,
+                    "regex",
+                    "Pattern mismatch",
+                    total_failed=regex_failed,
+                    sample_values=_sample_values(series, regex_mask),
+                )
 
         # Date Checks
         if rules.get("no_future_dates") or "date_format" in rules:
             fmt = rules.get("date_format", "%Y-%m-%d")
-            date_col = df[column].str.to_datetime(format=fmt, strict=False)
+            date_col = series.str.to_datetime(format=fmt, strict=False)
 
             if date_col.null_count() > 0:
                 _add_error(
                     report, column, "date_format", f"Format mismatch (expected {fmt})"
                 )
             elif rules.get("no_future_dates"):
-                future = df.filter(date_col > datetime.now())
-                if future.height > 0:
+                future_mask = (date_col > datetime.now()).fill_null(False)
+                future_failed = int(future_mask.sum())
+                if future_failed > 0:
                     _add_error(
-                        report, column, "no_future_dates", "Future date found", future
+                        report,
+                        column,
+                        "no_future_dates",
+                        "Future date found",
+                        total_failed=future_failed,
+                        sample_values=_sample_values(series, future_mask),
                     )
 
     return report
