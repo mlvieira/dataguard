@@ -17,8 +17,9 @@ def validate(
     typer.echo(f"Validating {input_file} against {schema_file}...")
 
     schema = load_schema(schema_file)
-    df = pl.scan_csv(input_file).collect()
+    cols_to_check = list(schema.keys())
 
+    df = pl.scan_csv(input_file).select(cols_to_check).collect()
     if validate_dataframe(df, schema):
         typer.secho("Success: Data matches schema!", fg=typer.colors.GREEN)
     else:
