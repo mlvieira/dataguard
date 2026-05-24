@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import polars as pl
 
 
@@ -94,5 +96,26 @@ def validate_dataframe(df: pl.DataFrame, schema: dict) -> bool:
                 offending_values = invalid_rows[column].unique().to_list()
                 print(f"  -> Found invalid values: {offending_values}")
                 is_valid = False
+
+        if rules.get("no_future_dates") or rules.get("date_format"):
+            fmt_date = rules.get("date_format", "%Y-%m-%d")
+
+            date_col = df[column].str.to_datetime(format=fmt_date, strict=False)
+
+            if date_col.null_count() > 0:
+                print(
+                    f"FAILED: '{column}' has values that don't match format '{fmt_date}'"
+                )
+                is_valid = False
+
+            if rules.get("no_future_dates"):
+                now = datetime.now()
+                future_rows = df.filter(date_col > now)
+
+                if future_rows.height > 0:
+                    print(
+                        f"FAILED: '{column}' contains {future_rows.height} future dates."
+                    )
+                    is_valid = False
 
     return is_valid
