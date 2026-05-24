@@ -32,7 +32,7 @@ def validate_dataframe(df: pl.DataFrame, schema: dict) -> bool:
 
         # Check Nullability
         if rules.get("nullable") is False:
-            null_count = df[column].is_null().sum()
+            null_count = df[column].null_count()
             if null_count > 0:
                 print(f"FAILED: '{column}' has {null_count} nulls but is non-nullable.")
                 is_valid = False
