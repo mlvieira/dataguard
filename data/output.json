@@ -1,0 +1,62 @@
+{
+  "timestamp": "2026-05-24T13:16:02.107497",
+  "file": "data/data.csv",
+  "status": "FAILED",
+  "errors": [
+    {
+      "column": "user_id",
+      "rule": "type",
+      "message": "Type mismatch",
+      "total_failed": 1,
+      "sample_offending_values": [
+        "a"
+      ]
+    },
+    {
+      "column": "username",
+      "rule": "nullable",
+      "message": "Contains null values"
+    },
+    {
+      "column": "status",
+      "rule": "allowed_values",
+      "message": "Invalid categorical value",
+      "total_failed": 1,
+      "sample_offending_values": [
+        "unknown"
+      ]
+    },
+    {
+      "column": "age",
+      "rule": "min_value",
+      "message": "Value below 18",
+      "total_failed": 1,
+      "sample_offending_values": [
+        17
+      ]
+    },
+    {
+      "column": "age",
+      "rule": "max_value",
+      "message": "Value above 120",
+      "total_failed": 1,
+      "sample_offending_values": [
+        121
+      ]
+    },
+    {
+      "column": "email",
+      "rule": "regex",
+      "message": "Pattern mismatch",
+      "total_failed": 1,
+      "sample_offending_values": [
+        "bob@email"
+      ]
+    },
+    {
+      "column": "signup_date",
+      "rule": "date_format",
+      "message": "Format mismatch (expected %Y-%m-%d)"
+    }
+  ]
+}
